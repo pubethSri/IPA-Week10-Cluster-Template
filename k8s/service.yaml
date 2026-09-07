@@ -1,0 +1,29 @@
+# The Service in front of your pods.
+#
+# ClusterIP: reachable from inside the cluster only. Outside traffic arrives
+# through the Ingress (ingress.yaml), which is what forwards to this Service.
+#
+# The selector is what decides which pods are behind it. It matches on the label
+# `app: epimetheus`, which deployment.yaml puts on every pod it creates — so
+# scaling your replicas up or down adds and removes endpoints here
+# automatically, with nothing to edit.
+#
+# Worth looking at while you scale:
+#
+#   kubectl get endpoints epimetheus
+apiVersion: v1
+kind: Service
+metadata:
+  name: epimetheus
+  labels:
+    app: epimetheus
+spec:
+  type: ClusterIP
+  selector:
+    app: epimetheus
+  ports:
+    - name: http
+      # The port this Service answers on.
+      port: 8080
+      # The port on the pod it forwards to.
+      targetPort: 8080

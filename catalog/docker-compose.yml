@@ -1,0 +1,74 @@
+# The Catalog database.
+#
+# Run this ON THE RANCHER VM, before you deploy Epimetheus. The application
+# reads its orders from here, and it will not become ready without it.
+#
+#   docker compose -f catalog/docker-compose.yml up -d
+#
+# That is the whole procedure. The image already contains the catalog data, so
+# there is no dump to download and no psql command to run.
+#
+# The first start takes a few minutes while it loads about 41 MB of orders.
+# `docker compose ps` shows the container as `health: starting` until the load
+# finishes, and `healthy` once the data is really there — wait for `healthy`
+# before deploying Epimetheus, or your pods will start against an empty
+# database.
+#
+#   docker compose -f catalog/docker-compose.yml ps
+#   docker compose -f catalog/docker-compose.yml logs -f catalog
+#
+# The database runs here, outside Kubernetes, rather than as a pod. It is a
+# stateful dependency shared by every pod you run, and treating it as part of
+# the surrounding environment — the way you ran MongoDB last week — keeps it out
+# of the resource budget your namespace is measured against.
+
+services:
+  catalog:
+    image: "<DOCKERHUB_OWNER>/catalog-db:v1"
+    container_name: epimetheus-catalog
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_PASSWORD: pithos
+      POSTGRES_DB: catalog
+
+    command:
+      - postgres
+      # How many connections this database will accept at once, in total, from
+      # every pod you run. Postgres also holds a few back for administrators, so
+      # the number your application can actually reach is slightly lower.
+      #
+      # This is a property of the environment, not a setting you tune. Leave it
+      # alone — it is the same for every pair.
+      - "-c"
+      - "max_connections=${CATALOG_MAX_CONNECTIONS:-12}"
+
+    ports:
+      # Your pods reach this at your rancher VM's address on port 5432. That
+      # address goes into the DB_URL Secret you create when deploying.
+      - "${CATALOG_HOST_PORT:-5432}:5432"
+
+    volumes:
+      - catalog-data:/var/lib/postgresql/data
+
+    healthcheck:
+      # This checks that the data actually loaded, not merely that Postgres is
+      # accepting connections — during the initial load it will do the latter
+      # while the tables are still filling.
+      test:
+        - "CMD-SHELL"
+        - "psql -U postgres -d catalog -tAc 'SELECT count(*) = 200000 FROM orders' | grep -q '^t$$'"
+      start_period: 300s
+      interval: 10s
+      timeout: 10s
+      retries: 6
+
+volumes:
+  catalog-data:
+
+# If you ever need to start the database over from scratch, remove the volume —
+# the data only loads into an empty one, so recreating the container on its own
+# will not reload it:
+#
+#   docker compose -f catalog/docker-compose.yml down -v
+#   docker compose -f catalog/docker-compose.yml up -d

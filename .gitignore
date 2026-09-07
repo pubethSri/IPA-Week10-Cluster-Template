@@ -1,0 +1,16 @@
+# Never commit a credential, even to a private repository.
+#
+# The database connection string is a Kubernetes Secret created during setup, not
+# a file in here. If you ever write one down locally while working, these keep it
+# out of your history.
+*.env
+.env
+secret*.yaml
+*-secret.yaml
+
+# Editor and OS noise.
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

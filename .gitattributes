@@ -1,0 +1,17 @@
+# Line endings.
+#
+# This repository is cloned on a Linux VM and its files are read by Linux tools,
+# but it may pass through a Windows machine on the way. Git on Windows would
+# otherwise check these out with CRLF endings, and a stray carriage return
+# breaks things in ways that never mention line endings as the cause:
+#
+#   check-normalisation.sh  ->  bad interpreter: /usr/bin/env bash^M
+#   a YAML manifest         ->  parse errors pointing at the wrong line
+#
+# Forcing LF in the working tree removes the whole class of problem.
+
+*           text=auto eol=lf
+*.sh        text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.md        text eol=lf

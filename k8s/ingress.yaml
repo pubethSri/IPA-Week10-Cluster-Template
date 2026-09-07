@@ -1,0 +1,40 @@
+# How requests reach Epimetheus from outside the cluster.
+#
+# This is the same ingress-nginx controller you installed and used last week,
+# on the same `ipa.local` host name, so nothing here is a new idea — only a new
+# rule pointing at a new Service.
+#
+# The load generator sends its orders to this path. If this rule is wrong, runs
+# fail with connection or 404 errors rather than with anything interesting, so
+# it is worth confirming before your first run:
+#
+#   curl -H "Host: ipa.local" -X POST http://localhost:8080/pack \
+#        -H 'Content-Type: application/json' -d '{"order_id": 1}'
+#
+# Run that on the rancher VM. `ipa.local` is a hosts-file entry on your own PC
+# and does not exist on the VM, so you reach HAProxy at localhost:8080 and pass
+# the name it routes on as a header. From a browser on your PC the same request
+# is just http://ipa.local:8080/pack. Either way the path is the one you built in
+# Week09: HAProxy -> the ingress controller's NodePort -> the Service.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: epimetheus
+  labels:
+    app: epimetheus
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ipa.local
+      http:
+        paths:
+          # A prefix rule, so /pack and anything under it reaches the Service.
+          # Other rules already exist on this host — Argo CD is on /argocd —
+          # and nginx matches the longest prefix, so they do not collide.
+          - path: /pack
+            pathType: Prefix
+            backend:
+              service:
+                name: epimetheus
+                port:
+                  number: 8080

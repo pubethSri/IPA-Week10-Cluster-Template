@@ -1,0 +1,46 @@
+# Epimetheus settings.
+#
+# Three of these are yours to tune. Two are shown so you can see them, and must
+# not be changed — they describe the catalog the service is packing against, and
+# changing them makes Epimetheus produce wrong answers rather than slow ones.
+#
+# IMPORTANT: editing this file does not restart anything. A running pod reads
+# its environment once, at start. After committing a change here you must roll
+# the deployment:
+#
+#   kubectl rollout restart deployment/epimetheus
+#
+# This catches everybody once. If a setting you changed does not seem to be
+# doing anything, check that the pods were restarted after the change landed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: epimetheus-config
+data:
+  # ---- Yours to tune -----------------------------------------------------
+
+  # Database connections held open per pod.
+  #
+  # Every pod opens its own pool, so the total number of connections your
+  # deployment asks the database for is this value times your replica count.
+  DB_POOL_SIZE: "8"
+
+  # Keep the customer table in memory instead of querying it per request.
+  # "true" or "false".
+  CACHE_CUSTOMERS: "false"
+
+  # Maximum number of orders held in the in-memory order cache.
+  # 0 disables the cache entirely. There is no "unlimited" — a number is a
+  # number, and the size you choose is a decision you are making about memory.
+  CACHE_ORDERS_MAX: "0"
+
+  # ---- Fixed. Visible so you know they exist; do not change them ---------
+
+  # How many packing arrangements the service tries before returning its best.
+  # This must match the catalog the load generator verifies against: a different
+  # budget produces plans that disagree with the expected result on a subset of
+  # orders, and the run will be refused before it starts.
+  ATTEMPT_BUDGET_K: "15000"
+
+  # Box size in cm3. Must match the catalog.
+  BOX_CAPACITY_CM3: "40000"

@@ -1,0 +1,108 @@
+# Epimetheus — the packing service you are deploying, scaling and tuning.
+#
+# Three things in this file are yours to change:
+#
+#   replicas                        how many pods
+#   resources.limits.cpu            CPU ceiling per pod
+#   resources.limits.memory         memory ceiling per pod
+#
+# Your namespace has a ResourceQuota, and it bounds *limits*. So the three
+# numbers above trade against each other: a bigger pod means fewer of them.
+# Ask for more than the quota allows and the extra pod stays Pending — that is
+# the quota working, not a bug.
+#
+#   kubectl describe quota
+#   kubectl get pods
+#
+# The other settings live in configmap.yaml. Remember that changing either file
+# needs `kubectl rollout restart deployment/epimetheus` to reach running pods.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: epimetheus
+  labels:
+    app: epimetheus
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: epimetheus
+
+  template:
+    metadata:
+      labels:
+        app: epimetheus
+    spec:
+      containers:
+        - name: epimetheus
+          image: "<DOCKERHUB_OWNER>/epimetheus:v1"
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          envFrom:
+            - configMapRef:
+                name: epimetheus-config
+
+          env:
+            # The database connection string, including its password, so it is
+            # a Secret rather than part of configmap.yaml. It is created for you
+            # during setup and is deliberately not in this repository — never
+            # commit a credential, even to a private repo.
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: epimetheus-db
+                  key: DB_URL
+
+            # These three tell the service about itself so that its /metrics
+            # can report which pod produced a measurement and what it was
+            # allowed to use. They are filled in by Kubernetes, not by you.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_CPU_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: epimetheus
+                  resource: limits.cpu
+                  # Millicores: 500m limit reports as "500".
+                  divisor: "1m"
+            - name: POD_MEMORY_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: epimetheus
+                  resource: limits.memory
+                  # Mebibytes: a 128Mi limit reports as "128".
+                  divisor: "1Mi"
+
+          resources:
+            # Requests are what the scheduler reserves — what a pod is
+            # guaranteed. Limits are the ceiling it may burst to.
+            requests:
+              cpu: "300m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+
+          # Is the process alive? A failing liveness probe restarts the pod.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+          # Should this pod receive traffic? A failing readiness probe takes the
+          # pod out of the Service without restarting it — useful when a pod is
+          # briefly unable to serve but is not broken.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
