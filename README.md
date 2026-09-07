@@ -13,7 +13,7 @@ that gets marked.
 ## What is in here
 
 ```
-k8s/                        Argo CD deploys this directory, and only this one
+epimetheus/                 Argo CD deploys this directory, and only this one
   deployment.yaml           replicas, resources.limits.cpu, resources.limits.memory
   configmap.yaml            DB_POOL_SIZE, CACHE_CUSTOMERS, CACHE_ORDERS_MAX
   service.yaml              the ClusterIP in front of your pods
@@ -25,11 +25,22 @@ catalog/
 argocd/
   application.yaml          the Argo CD Application; edit two lines, apply once
 
+pandora/                    the load generator; edit ONE line, apply once
+  namespace.yaml
+  pvc.yaml
+  service.yaml
+  deployment.yaml           <- your team name goes here
+
 check-normalisation.sh      checks your cluster is set up correctly
 ```
 
-**Only `k8s/` is synced.** The other two directories are things you run yourself,
-once, during setup — Argo CD does not look at them.
+**Only `epimetheus/` is synced.** The other three directories are things you run
+yourself, once, during setup — Argo CD does not look at them.
+
+`pandora/` is the load generator: the instrument every result this week is
+measured with. One line in it is yours — your team name — and the rest is
+deliberately fixed, because a harness that was tuned between runs would make two
+of your own results incomparable with no way to tell which.
 
 ## Where to work
 

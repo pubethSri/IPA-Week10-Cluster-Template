@@ -1,0 +1,132 @@
+# The load generator.
+#
+# ONE LINE IS YOURS TO CHANGE: the team name, marked below. Everything else is
+# the instrument, and changing it changes what your results mean rather than
+# what they say.
+#
+#   sed -i 's/REPLACE_WITH_ROSTER_NAME/YourTeamName/' pandora/deployment.yaml
+#   kubectl apply -f pandora/
+#
+# Your team name is on the sign-up sheet, in your row. Spelling and
+# capitalisation both matter: the panel will warn you before a run if the name
+# is not one it recognises, because reports filed under a misspelling cannot be
+# grouped with the rest of yours.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pandora
+  namespace: pandora
+  labels:
+    app.kubernetes.io/name: pandora
+    app.kubernetes.io/part-of: epimetheus-lab
+spec:
+  # One. Two would write reports into the same directory with no way to tell
+  # which produced what.
+  replicas: 1
+  strategy:
+    # The volume can only be attached to one pod at a time, so the old pod has
+    # to go before the new one starts. A rolling update would wait forever.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pandora
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pandora
+    spec:
+      # Runs on worker2, with the infrastructure, so that generating the load
+      # does not compete with the application being measured.
+      #
+      # Both lines are needed and they do different jobs: the toleration lets
+      # this pod past worker2's taint, and the nodeSelector is what actually
+      # puts it there.
+      nodeSelector:
+        kubernetes.io/hostname: worker2
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: infra
+          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: pandora
+          # Pinned to a version on purpose. If this were :latest, a pod restart
+          # could quietly pull a different build, and runs from before and after
+          # would not be comparable.
+          image: "cruzsri/pandora:v1"
+          args:
+            - "--serve"
+
+            # ---- THE ONE LINE YOU EDIT --------------------------------------
+            - "--team"
+            - "REPLACE_WITH_ROSTER_NAME"
+            # -----------------------------------------------------------------
+
+            # Where to send the load. This goes to the ingress controller by its
+            # in-cluster address, and asks for the host your Ingress rule
+            # matches on — so the traffic takes the same route through your
+            # cluster that any other request to your application does.
+            #
+            # Using the in-cluster name rather than an IP address also means
+            # this file is identical for every pair, and that a mistyped address
+            # cannot send your load at somebody else's cluster.
+            - "--target-url"
+            - "http://ingress-nginx-controller.ingress-nginx.svc/pack"
+            - "--host"
+            - "ipa.local"
+
+            # The load generator reads Prometheus before and after each run.
+            # Some things in a report — how many pods were running, what they
+            # were allowed to use, how hard they were being held back — are
+            # properties of your deployment that the traffic itself cannot see.
+            #
+            # This is also what the pre-run checks read. If Prometheus is not
+            # reachable, or is not scraping what it should be, you find out
+            # here rather than after a run you cannot interpret.
+            - "--prometheus-url"
+            - "http://prometheus.monitoring:9090"
+
+            # Must match how often your Prometheus scrapes. Some values in the
+            # report are computed over sampled windows, and this is what sets
+            # their resolution.
+            - "--scrape-interval"
+            - "5s"
+
+            - "--out"
+            - "/runs"
+          ports:
+            - name: http
+              containerPort: 9900
+          volumeMounts:
+            - name: runs
+              mountPath: /runs
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              memory: "512Mi"
+          # **Deliberately no CPU limit.** If the load generator were ever the
+          # slow part, your results would be measurements of it rather than of
+          # your deployment — and nothing in the numbers would say so. It
+          # reports whether it kept up with its own target rate, and that check
+          # only means something if it was never constrained.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            # It loads its order catalog at start-up, which takes a moment.
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: runs
+          persistentVolumeClaim:
+            claimName: pandora-runs

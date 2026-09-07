@@ -24,9 +24,9 @@ spec:
     # REPLACE_ME — e.g. https://github.com/<you>/<your-repo>.git
     repoURL: REPLACE_ME_WITH_YOUR_REPO_URL
     targetRevision: HEAD
-    # Only k8s/ is deployed. The catalog/ and argocd/ directories in this
-    # repository are things you run by hand, and Argo CD ignores them.
-    path: k8s
+    # Only this directory is deployed. catalog/, argocd/ and pandora/ are
+    # things you run by hand once, and Argo CD ignores them.
+    path: epimetheus
 
   destination:
     server: https://kubernetes.default.svc
