@@ -24,7 +24,7 @@
 
 services:
   catalog:
-    image: "<DOCKERHUB_OWNER>/catalog-db:v1"
+    image: "cruzsri/catalog-db:v1"
     container_name: epimetheus-catalog
     restart: unless-stopped
 
