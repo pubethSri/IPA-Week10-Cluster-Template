@@ -1,0 +1,130 @@
+# This is the `prometheus` chart, NOT `kube-prometheus-stack`. That one brings an
+# operator and a large default rule set, and a 2 vCPU / 4 GB node will not carry it.
+
+server:
+  # Must end up named `prometheus` on port 9090 — the load generator's address for
+  # it is frozen. Left alone the chart would use `<release>-server` on port 80.
+  # Check with `kubectl -n monitoring get svc`.
+  fullnameOverride: prometheus
+  service:
+    servicePort: 9090
+
+    # NodePort because Grafana runs outside the cluster, on your rancher VM, and a
+    # ClusterIP address only exists inside. The other NodePorts are taken, so
+    # Prometheus uses this one.
+    type: NodePort
+    nodePort: 30909
+
+  # Both are needed. The toleration gets these pods PAST worker2's taint; the
+  # nodeSelector is what puts them there.
+  nodeSelector:
+    kubernetes.io/hostname: worker2
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+
+  # A run is minutes, not days. Lower this if worker2 runs short of memory.
+  retention: 2h
+
+  persistentVolume:
+    # Off: a run's evidence lives in its report, not in Prometheus.
+    enabled: false
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      memory: "768Mi"
+
+  global:
+    # The load generator expects exactly 5s. A mismatch makes some run-report
+    # values interpolation rather than measurement. Leave it alone.
+    scrape_interval: 5s
+    evaluation_interval: 5s
+
+# ---- components not installed ---------------------------------------------
+alertmanager:
+  # Nothing pages anybody in a teaching lab, and it costs memory this node lacks.
+  enabled: false
+
+prometheus-pushgateway:
+  enabled: false
+
+prometheus-node-exporter:
+  # A DaemonSet, so node-level CPU and memory for both sides of the split.
+  enabled: true
+
+kube-state-metrics:
+  enabled: true
+  nodeSelector:
+    kubernetes.io/hostname: worker2
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+
+# ---- what gets scraped -----------------------------------------------------
+#
+# **One of the four jobs is missing, and writing it is yours.** Stage 3.1 of the
+# lab sheet walks you through it.
+#
+# **Do not remove the kubelet cAdvisor job.** It is the only place some facts
+# about your pods exist at all, and leaving it out reports no error — the
+# dashboard still draws and some numbers are quietly zero, which looks exactly
+# like a system behaving well.
+extraScrapeConfigs: |
+  # ---- YOUR JOB GOES HERE -------------------------------------------------
+  #
+  # Three jobs are given to you below. The one that scrapes your own
+  # application is not, and stage 3.1 of the lab sheet walks you through
+  # writing it: find the pods labelled app=epimetheus, scrape port 8080.
+  #
+  # Add it above this line, at this indentation. Everything under
+  # `extraScrapeConfigs:` is one block of text handed to Prometheus as written,
+  # so the indentation is part of the meaning.
+  # --------------------------------------------------------------------------
+
+  - job_name: pandora
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [pandora]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        action: keep
+        regex: pandora
+      - source_labels: [__meta_kubernetes_pod_container_port_number]
+        action: keep
+        regex: "9900"
+
+  - job_name: ingress-nginx
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [ingress-nginx]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        action: keep
+        regex: metrics
+
+  # Do not remove this job. See the note above.
+  - job_name: kubelet-cadvisor
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      insecure_skip_verify: true
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor

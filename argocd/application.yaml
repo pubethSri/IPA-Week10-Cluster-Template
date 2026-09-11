@@ -1,17 +1,14 @@
 # The Argo CD Application that deploys Epimetheus from this repository.
 #
-# EDIT TWO LINES before applying it — they are marked REPLACE_ME below:
+# EDIT TWO LINES before applying, both marked REPLACE_ME below:
 #
 #   spec.source.repoURL            your own repository's URL
 #   spec.destination.namespace     the namespace you are deploying into
 #
-# Then:
-#
 #   kubectl apply -f argocd/application.yaml
 #
-# The namespace must already exist, with its ResourceQuota, before you apply
-# this. Argo CD deliberately will not create it for you — see the note at the
-# bottom.
+# Your namespace must already exist, with its ResourceQuota, before you apply
+# this. CreateNamespace is off on purpose — see the bottom of the file.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -24,8 +21,8 @@ spec:
     # REPLACE_ME — e.g. https://github.com/<you>/<your-repo>.git
     repoURL: REPLACE_ME_WITH_YOUR_REPO_URL
     targetRevision: HEAD
-    # Only this directory is deployed. catalog/, argocd/ and pandora/ are
-    # things you run by hand once, and Argo CD ignores them.
+    # Only this directory is deployed. catalog/, argocd/ and pandora/ are run
+    # by hand, and Argo CD ignores them.
     path: epimetheus
 
   destination:
@@ -35,26 +32,18 @@ spec:
 
   syncPolicy:
     automated:
-      # OFF, and this is different from what you set up last week.
-      #
-      # With self-heal on, Argo CD reverts anything you change with kubectl —
-      # so a `kubectl scale` would quietly disappear a few seconds later and you
-      # would lose time to a change that did apply and then vanished.
-      #
-      # Off, you can experiment imperatively when that is faster, and Argo CD
-      # shows OutOfSync as a standing reminder that Git does not yet match what
-      # is running. Commit when you have decided: your repository is what gets
-      # marked, and "Synced and green at the end" is the requirement.
+      # OFF, unlike what you set up last week. With self-heal on, anything you
+      # change with kubectl is reverted a few seconds later — a `kubectl scale`
+      # would apply and then silently vanish. Off, OutOfSync stands as a
+      # reminder that Git does not yet match what is running.
       selfHeal: false
 
-      # Also off. Pruning deletes resources you removed from Git, which is
-      # correct in production and unhelpful here — a half-finished edit would
-      # quietly delete a running Service.
+      # Also off: on a half-finished edit, pruning would delete a running
+      # Service.
       prune: false
 
     syncOptions:
-      # Your namespace is created during setup, together with the ResourceQuota
-      # that gives you your budget. If Argo CD created it instead, it would make
-      # one with no quota on it, and nothing would tell you that your budget had
-      # silently disappeared.
+      # Your namespace is created during setup, with the ResourceQuota that is
+      # your budget. Argo CD would create one without a quota, and nothing
+      # would tell you the budget had gone.
       - CreateNamespace=false

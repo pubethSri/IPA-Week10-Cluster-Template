@@ -1,18 +1,8 @@
-# The load generator's control panel, and its own /metrics.
+# The load generator's control panel and its own /metrics, on NodePort 30900.
 #
-# The panel is on NodePort 30900, so it is reachable at any worker's address on
-# that port. You will not normally use that form: during setup you add an
-# HAProxy frontend on your rancher VM that forwards port 9900 to it, so the
-# address you actually use is
-#
-#   http://ipa.local:9900
-#
-# That name resolves through the hosts file on your own PC and points at your
-# own rancher VM, so it reaches your cluster and nobody else's.
-#
-# The NodePort below is what that frontend forwards to. Use it directly —
-# http://<a worker's IP>:30900 — if you are ever debugging HAProxy itself and
-# want to take it out of the path.
+# Setup adds an HAProxy frontend forwarding http://ipa.local:9900 here, which is
+# the address you normally use. Go direct to <a worker's IP>:30900 only when
+# debugging HAProxy itself.
 apiVersion: v1
 kind: Service
 metadata:

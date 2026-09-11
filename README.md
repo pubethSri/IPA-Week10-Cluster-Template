@@ -22,6 +22,9 @@ epimetheus/                 Argo CD deploys this directory, and only this one
 catalog/
   docker-compose.yml        the database, run by hand on the rancher VM
 
+monitoring/
+  values.yaml               Prometheus settings, for the helm install
+
 argocd/
   application.yaml          the Argo CD Application; edit two lines, apply once
 
@@ -34,8 +37,13 @@ pandora/                    the load generator; edit ONE line, apply once
 check-normalisation.sh      checks your cluster is set up correctly
 ```
 
-**Only `epimetheus/` is synced.** The other three directories are things you run
+**Only `epimetheus/` is synced.** The other four directories are things you run
 yourself, once, during setup — Argo CD does not look at them.
+
+**There is no `grafana/` here and that is deliberate.** You create Grafana's
+compose file yourself, from a block in the lab sheet — the same act as last
+week's Rancher compose, on the same VM. One line of what you type is the answer
+to the step after it.
 
 `pandora/` is the load generator: the instrument every result this week is
 measured with. One line in it is yours — your team name — and the rest is
@@ -111,6 +119,19 @@ It reads your cluster and changes nothing. It reports **every** check rather tha
 stopping at the first problem, so one run tells you everything that needs fixing.
 `PASS` and `FAIL` are what they look like; `WARN` is worth reading but does not
 block you.
+
+## Where things are, once you are set up
+
+| | |
+|---|---|
+| Your application | `http://ipa.local:8080/pack` |
+| Load generator | `http://ipa.local:9900` |
+| Prometheus | `http://ipa.local:9090` |
+| Grafana | `http://ipa.local:3000` |
+| Argo CD | `http://ipa.local:8080/argocd` |
+
+All of these are your own cluster. `ipa.local` is a line in the hosts file on your
+own PC, so it points at your rancher VM and nobody else's.
 
 ## Useful while you work
 

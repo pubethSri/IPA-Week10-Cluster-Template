@@ -1,13 +1,5 @@
-# The load generator lives in its own namespace.
-#
-# Two reasons, and both matter to you:
-#
-# It is outside your namespace, so it does not spend your ResourceQuota. Your
-# budget is for your application.
-#
-# It is the instrument you are measuring with. Everything else this week
-# changes; this does not. If the load generator were tuned between runs, two of
-# your results would not be comparable and you would have no way to tell which.
+# The load generator runs in its own namespace, outside yours, so it does not
+# spend your ResourceQuota.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -15,7 +7,5 @@ metadata:
   labels:
     app.kubernetes.io/name: pandora
     app.kubernetes.io/part-of: epimetheus-lab
-    # Not student territory: this is the measuring instrument, not part of your
-    # deployment. Labelled so it is obvious when reading the cluster rather than
-    # only when reading the sheet.
+    # Marks this as the measuring instrument, not part of your deployment.
     epimetheus.lab/sealed: "true"

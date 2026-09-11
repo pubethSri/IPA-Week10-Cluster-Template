@@ -1,27 +1,19 @@
-# Where your run history is kept.
+# Run reports are kept here. Without this volume, restarting the pod erases your
+# run history.
 #
-# Every run you do writes a report here, and the list of past runs is rebuilt by
-# reading this directory at start-up. **Without this volume, restarting the pod
-# would erase every run you had done** — and that list is the record of what you
-# tried, which is the raw material of your write-up.
-#
-# If this claim ever shows as Pending rather than Bound, the load generator will
-# never start. Check that your cluster has the `local-path` storage class:
-#
-#   kubectl get storageclass
+# If this ever shows Pending rather than Bound, the load generator will never
+# start — check that `kubectl get storageclass` lists `local-path`.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: pandora-runs
   namespace: pandora
 spec:
-  # Named rather than left to the default, so a cluster whose default storage
-  # class has been changed does not quietly bind something else.
+  # Named, not left to the default, so a cluster whose default has been changed
+  # does not quietly bind something else.
   storageClassName: local-path
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      # A run report is a few kilobytes of JSON. This is sized so that you never
-      # have to think about it.
       storage: 1Gi

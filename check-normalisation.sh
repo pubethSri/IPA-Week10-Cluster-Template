@@ -170,6 +170,46 @@ else
     note "lets it past the taint without putting it anywhere in particular"
 fi
 
+# PROXY protocol, which Week09 stage 5 turned on so the application could log
+# real client IPs. Nothing this week needs them, and the load generator speaks
+# plain HTTP to the controller's ClusterIP — so left on, every request it sends
+# fails, and it fails looking like an application fault rather than a routing
+# one. Stage 1.5 turns it off and 1.9 removes HAProxy's half of it.
+
+proxy_proto=$(kubectl -n ingress-nginx get configmap ingress-nginx-controller \
+    -o jsonpath='{.data.use-proxy-protocol}' 2>/dev/null)
+
+case "$proxy_proto" in
+    "true")
+        no "ingress-nginx still has use-proxy-protocol=true"
+        note "the load generator does not send a PROXY header, so every request"
+        note "it makes will fail. Re-run the helm upgrade in step 1.5 with"
+        note "--set-string controller.config.use-proxy-protocol=false"
+        ;;
+    "false"|"")
+        ok "ingress-nginx is not expecting PROXY protocol"
+        ;;
+    *)
+        warned "use-proxy-protocol is '${proxy_proto}', which is neither true nor false"
+        ;;
+esac
+
+# The HAProxy half, checked only if this script can see the file. It runs on the
+# rancher VM, so usually it can.
+
+if [ -r /etc/haproxy/haproxy.cfg ]; then
+    if grep -q 'send-proxy' /etc/haproxy/haproxy.cfg; then
+        no "haproxy.cfg still sends PROXY protocol (send-proxy-v2)"
+        note "with the controller no longer expecting it, nginx reads the PROXY"
+        note "header as the request line and answers 400. Step 1.9 says to remove"
+        note "it from backend be_http's server lines"
+    else
+        ok "haproxy.cfg does not send PROXY protocol"
+    fi
+else
+    warned "cannot read /etc/haproxy/haproxy.cfg — skipping the HAProxy half of this check"
+fi
+
 # --------------------------------------------------------------------------
 hr "4. the ResourceQuota"
 # --------------------------------------------------------------------------
