@@ -45,6 +45,11 @@ spec:
           effect: NoSchedule
       securityContext:
         runAsNonRoot: true
+        # Must be numeric. The image's USER is the name `nonroot`, which
+        # kubelet cannot verify against runAsNonRoot — without these two lines
+        # the pod stops at CreateContainerConfigError and never starts.
+        runAsUser: 65532
+        runAsGroup: 65532
       containers:
         - name: pandora
           # Pinned on purpose: :latest could change under a restart and make

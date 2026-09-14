@@ -28,9 +28,35 @@ pass=0
 fail=0
 warn=0
 
-ok()   { printf 'PASS  %s\n' "$*"; pass=$((pass + 1)); }
-no()   { printf 'FAIL  %s\n' "$*"; fail=$((fail + 1)); }
-warned() { printf 'WARN  %s\n' "$*"; warn=$((warn + 1)); }
+# Colour, when the terminal will take it. The words PASS/FAIL/WARN carry the
+# meaning by themselves — colour only reinforces them — so a pipe, a redirect, a
+# dumb terminal or NO_COLOR=1 loses nothing. CLICOLOR_FORCE=1 keeps colour
+# through a pipe, for `... | less -R`.
+#
+# Deliberately not green/red. That is the one pair red-green colour blindness
+# cannot separate, and it is by far the most common kind. Blue, amber and
+# magenta stay distinct under it, because magenta keeps a blue component that
+# amber has none of.
+# NO_COLOR always wins. Otherwise colour if it was forced, or if stdout is a
+# terminal that can show it. Forcing is what makes `... | less -R` work.
+if [ -n "${NO_COLOR:-}" ]; then
+    C_PASS='' ; C_WARN='' ; C_FAIL='' ; C_OFF=''
+elif [ -n "${CLICOLOR_FORCE:-}" ] || { [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; }; then
+    if [ "$(tput colors 2>/dev/null || echo 0)" -ge 256 ]; then
+        C_PASS=$'\033[38;5;32m'     # blue
+        C_WARN=$'\033[38;5;214m'    # amber
+        C_FAIL=$'\033[1;38;5;170m'  # magenta, bold
+    else
+        C_PASS=$'\033[34m' ; C_WARN=$'\033[33m' ; C_FAIL=$'\033[1;35m'
+    fi
+    C_OFF=$'\033[0m'
+else
+    C_PASS='' ; C_WARN='' ; C_FAIL='' ; C_OFF=''
+fi
+
+ok()   { printf '%sPASS%s  %s\n' "$C_PASS" "$C_OFF" "$*"; pass=$((pass + 1)); }
+no()   { printf '%sFAIL%s  %s\n' "$C_FAIL" "$C_OFF" "$*"; fail=$((fail + 1)); }
+warned() { printf '%sWARN%s  %s\n' "$C_WARN" "$C_OFF" "$*"; warn=$((warn + 1)); }
 note() { printf '      %s\n' "$*"; }
 
 hr() { printf -- '---- %s %s\n' "$1" "$(printf '%.0s-' $(seq 1 $((60 - ${#1}))))"; }
@@ -336,8 +362,8 @@ case "$team" in
     ""|"--team")               no "Pandora has no --team set" ;;
     REPLACE_WITH_ROSTER_NAME)  no "Pandora --team is still the placeholder"
                                note "set it to your team name from the sign-up sheet row" ;;
-    *)                         ok "Pandora --team = ${team}"
-                               note "preflight will warn if this is not exactly a roster name" ;;
+    *)                         ok "Pandora --team is set: ${team}"
+                               note "not verified here — Pandora's preflight checks it against the roster" ;;
 esac
 
 # --------------------------------------------------------------------------
@@ -369,15 +395,18 @@ fi
 # --------------------------------------------------------------------------
 echo
 printf -- '---- result ------------------------------------------------------\n'
-printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"
+w_label=warnings
+[ "$warn" -eq 1 ] && w_label=warning
+printf '%d passed, %d failed, %d %s\n' "$pass" "$fail" "$warn" "$w_label"
 
 if [ "$fail" -gt 0 ]; then
     echo
-    echo "Your cluster is NOT ready. Fix the FAIL lines above and run this again."
+    printf '%sYour cluster is NOT ready.%s Fix the FAIL lines above and run this again.\n' \
+        "$C_FAIL" "$C_OFF"
     exit 1
 fi
 
 echo
-echo "Your cluster looks ready."
+printf '%sYour cluster looks ready.%s\n' "$C_PASS" "$C_OFF"
 [ "$warn" -gt 0 ] && echo "Warnings above are worth reading but do not block the lab."
 exit 0
